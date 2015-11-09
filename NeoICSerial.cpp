@@ -198,7 +198,12 @@ void NeoICSerial::flushOutput(void)
 static NeoICSerial::isr_t _isr;
 
 void NeoICSerial::attachInterrupt( isr_t fn )
-{ _isr = fn; }
+{
+  uint8_t oldSREG = SREG;
+  cli();
+    _isr = fn;
+  SREG = oldSREG;
+}
 
 static void rx_char( uint8_t rx_byte )
 {
