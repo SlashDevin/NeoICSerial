@@ -36,4 +36,8 @@ The original `AltSoftSerial` files were modified to include two new methods, `at
     static void detachInterrupt() { attachInterrupt( (isr_t) NULL ); };
 ```
 
-The following compatibilty constructor was removed
+The following compatibilty constructor was removed:
+```
+	  // for drop-in compatibility with NewSoftSerial, rxPin & txPin ignored
+	  AltSoftSerial(uint8_t rxPin, uint8_t txPin, bool inverse = false) { }
+```
