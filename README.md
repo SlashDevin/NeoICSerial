@@ -1,4 +1,4 @@
-The **NeoICSerial** class is intended as a drop-in replacement for Paul Stoffregen's class `AltSoftSerial`.  It adds the capability to register a function to be called when a new character is received.
+The **NeoICSerial** class is intended as a drop-in replacement for Paul Stoffregen's class [AltSoftSerial](https://github.com/PaulStoffregen/AltSoftSerial).  It adds the capability to register a function to be called when a new character is received.
 
 This class can only use one predefined Input Capture pin.  Each MCU and board has a pre-determined pin:
 
