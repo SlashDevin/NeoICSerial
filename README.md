@@ -13,6 +13,8 @@ This class can only use one predefined Input Capture pin.  Each MCU and board ha
 <tr><td> Sanguino </td><td align=center> 13 </td><td align=center> 14 </td><td align=center> 12</td></tr>
 </table>
 
+If the Input Capture pin is not available, you may want to consider [NeoHWSerial](https://github.com/SlashDevin/NeoHWSerial) or [NeoSWSerial](https://github.com/SlashDevin/NeoSWSerial).
+
 To handle received characters with your procedure, you must register it with the `NeoICSerial` class or your instance:
 
 ```
