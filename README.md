@@ -17,12 +17,23 @@ If the Input Capture pin is not available, you may want to consider [NeoHWSerial
 
 To handle received characters with your procedure, you must register it with the `NeoICSerial` class or your instance:
 
-```
-  NeoICSerial serial_port;
-  NeoICSerial::attachInterrupt( handleRxChar );
-     //  OR
-  serial_port.attachInterrupt( handleRxChar );
-```
+    #include <NeoICSerial.h>
+    NeoICSerial serial_port;
+
+    volatile uint32_t newlines = 0UL;
+
+    static void handleRxChar( uint8_t c )
+    {
+      if (c == '\n')
+        newlines++;
+    }
+
+    void setup()
+    {
+      serial_port.attachInterrupt( handleRxChar );
+      //  OR   NeoICSerial::attachInterrupt( handleRxChar );
+      serial_port.begin( 9600 );
+    }
 
 Remember that the registered procedure is called from an interrupt context, and it should return as quickly as possible.  Taking too much time in the procedure will cause many unpredictable behaviors, including loss of received data.  See the similar warnings for the built-in [`attachInterrupt`](https://www.arduino.cc/en/Reference/AttachInterrupt) for digital pins.
 
