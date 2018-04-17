@@ -1,9 +1,11 @@
 /* An Alternative Software Serial Library which uses Input Capture pins
- * http://www.pjrc.com/teensy/td_libs_NeoICSerial.html
+ * Based on:
+ *    http://www.pjrc.com/teensy/td_libs_AltSoftSerial.html
  * Copyright (c) 2014 PJRC.COM, LLC, Paul Stoffregen, paul@pjrc.com
+ *
  * Modified November 2015 by SlashDev
  *
- * AltSoftSerial always uses these pins:
+ * NeoICSerial always uses these pins:
  *
  * Board          Transmit  Receive   PWM Unusable
  * -----          --------  -------   ------------
@@ -40,17 +42,12 @@
 
 #include <inttypes.h>
 
-#if ARDUINO >= 100
 #include "Arduino.h"
-#else
-#include "WProgram.h"
-#include "pins_arduino.h"
-#endif
 
 #if defined(__arm__) && defined(CORE_TEENSY)
-#define ALTSS_BASE_FREQ F_BUS
+  #define ALTSS_BASE_FREQ F_BUS
 #else
-#define ALTSS_BASE_FREQ F_CPU
+  #define ALTSS_BASE_FREQ F_CPU
 #endif
 
 class NeoICSerial : public Stream
@@ -63,26 +60,22 @@ public:
 	int peek();
 	int read();
 	int available();
-#if ARDUINO >= 100
 	size_t write(uint8_t byte) { writeByte(byte); return 1; }
 	void flush() { flushOutput(); }
-#else
-	void write(uint8_t byte) { writeByte(byte); }
-	void flush() { flushInput(); }
-#endif
+
 	using Print::write;
 	static void flushInput();
 	static void flushOutput();
-	bool listen() { return false; }
-	bool isListening() { return true; }
-	bool overflow() { bool r = timing_error; timing_error = false; return r; }
-	static int library_version() { return 1; }
-	static void enable_timer0(bool enable) { }
-	static bool timing_error;
 
   typedef void (* isr_t)( uint8_t );
   static void attachInterrupt( isr_t fn );
-  static void detachInterrupt() { attachInterrupt( (isr_t) NULL ); };
+  static void detachInterrupt()
+    { attachInterrupt( nullptr ); };
+
+  typedef void (* TXCisr_t)();
+  static void attachTxCompleteInterrupt( TXCisr_t fn );
+  static void detachTxCompleteInterrupt()
+    { attachTxCompleteInterrupt( nullptr ); };
 private:
 	static void init(uint32_t cycles_per_bit);
 	static void writeByte(uint8_t byte);

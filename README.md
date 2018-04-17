@@ -1,4 +1,4 @@
-The **NeoICSerial** class is intended as a drop-in replacement for Paul Stoffregen's class [AltSoftSerial](https://github.com/PaulStoffregen/AltSoftSerial).  It adds the capability to register a function to be called when a new character is received.
+The **NeoICSerial** class is intended as a drop-in replacement for Paul Stoffregen's class [AltSoftSerial](https://github.com/PaulStoffregen/AltSoftSerial).  It adds the capability to register a function to be called when a new character is received or when all character have been transmitted.
 
 This class can only use one predefined Input Capture pin.  Each MCU and board has a pre-determined pin:
 
@@ -14,6 +14,8 @@ This class can only use one predefined Input Capture pin.  Each MCU and board ha
 </table>
 
 If the Input Capture pin is not available, you may want to consider [NeoHWSerial](https://github.com/SlashDevin/NeoHWSerial) or [NeoSWSerial](https://github.com/SlashDevin/NeoSWSerial).
+
+# RX character interrupt
 
 To handle received characters with your procedure, you must register it with the `NeoICSerial` class or your instance:
 
@@ -35,21 +37,30 @@ To handle received characters with your procedure, you must register it with the
       serial_port.begin( 9600 );
     }
 
-Remember that the registered procedure is called from an interrupt context, and it should return as quickly as possible.  Taking too much time in the procedure will cause many unpredictable behaviors, including loss of received data.  See the similar warnings for the built-in [`attachInterrupt`](https://www.arduino.cc/en/Reference/AttachInterrupt) for digital pins.
-
 The registered procedure will be called from the ISR whenever a character is received.  The received character **will not** be stored in the `rx_buffer`, and it **will not** be returned from `read()`.  Any characters that were received and buffered before `attachInterrupt` was called remain in `rx_buffer`, and could be retrieved by calling `read()`.
 
 If `attachInterrupt` is never called, or it is passed a `NULL` procedure, the normal buffering occurs, and all received characters must be obtained by calling `read()`.
 
-The original `AltSoftSerial` files were modified to include two new methods, `attachInterrupt` and `detachInterrupt`:
+# TX complete interrupt
+
+To detect when all characters have been transmitted, you must register it with the `NeoICSerial` class or your instance:
 
 ```
-    typedef void (* isr_t)( uint8_t );
-    static void attachInterrupt( isr_t fn );
-    static void detachInterrupt() { attachInterrupt( (isr_t) NULL ); };
+  NeoICSerial serial_port;
+  NeoICSerial::attachTxCompleteInterrupt( handleTxComplete );
+     //  OR
+  serial_port.attachTxCompleteInterrupt( handleTxComplete );
 ```
 
-The following compatibilty constructor was removed:
+Remember that these registered procedures are called from an interrupt context, and they should return as quickly as possible.  Taking too much time in these procedures will cause many unpredictable behaviors, including loss of received data.  See the similar warnings for the built-in [`attachInterrupt`](https://www.arduino.cc/en/Reference/AttachInterrupt) for digital pins.
+
+# Differences from current AltSoftSerial
+
+Support for Arduino IDE v1.0 was removed.
+
+New methods were added for the user-defined IRS: `attachInterrupt`/`detachInterrupt` and `attachTxCompleteInterrupt`/`detachTxCompleteInterrupt`.
+
+Methods for compatibilty with other software serial libraries were removed:
 ```
 	  // for drop-in compatibility with NewSoftSerial, rxPin & txPin ignored
 	  AltSoftSerial(uint8_t rxPin, uint8_t txPin, bool inverse = false) { }

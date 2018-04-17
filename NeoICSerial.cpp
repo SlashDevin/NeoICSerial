@@ -22,6 +22,9 @@
  * THE SOFTWARE.
  */
 
+// Revisions are now tracked on GitHub
+// https://github.com/PaulStoffregen/AltSoftSerial
+//
 // Version 1.2: Support Teensy 3.x
 //
 // Version 1.1: Improve performance in receiver code
@@ -38,7 +41,7 @@
 /****************************************/
 
 static uint16_t ticks_per_bit=0;
-bool NeoICSerial::timing_error=false;
+//bool NeoICSerial::timing_error=false;
 
 static uint8_t rx_state;
 static uint8_t rx_byte;
@@ -60,19 +63,41 @@ static volatile uint8_t tx_buffer[TX_BUFFER_SIZE];
 
 
 #ifndef INPUT_PULLUP
-#define INPUT_PULLUP INPUT
+  #define INPUT_PULLUP INPUT
 #endif
+
+#define MAX_COUNTS_PER_BIT  6241  // 65536 / 10.5
 
 void NeoICSerial::init(uint32_t cycles_per_bit)
 {
-	if (cycles_per_bit < 7085) {
+	//Serial.printf("cycles_per_bit = %d\n", cycles_per_bit);
+	if (cycles_per_bit < MAX_COUNTS_PER_BIT) {
 		CONFIG_TIMER_NOPRESCALE();
 	} else {
 		cycles_per_bit /= 8;
-		if (cycles_per_bit < 7085) {
+		//Serial.printf("cycles_per_bit/8 = %d\n", cycles_per_bit);
+		if (cycles_per_bit < MAX_COUNTS_PER_BIT) {
 			CONFIG_TIMER_PRESCALE_8();
 		} else {
-			return; // minimum 283 baud at 16 MHz clock
+#if defined(CONFIG_TIMER_PRESCALE_256)
+			cycles_per_bit /= 32;
+			//Serial.printf("cycles_per_bit/256 = %d\n", cycles_per_bit);
+			if (cycles_per_bit < MAX_COUNTS_PER_BIT) {
+				CONFIG_TIMER_PRESCALE_256();
+			} else {
+				return; // baud rate too low for AltSoftSerial
+			}
+#elif defined(CONFIG_TIMER_PRESCALE_128)
+			cycles_per_bit /= 16;
+			//Serial.printf("cycles_per_bit/128 = %d\n", cycles_per_bit);
+			if (cycles_per_bit < MAX_COUNTS_PER_BIT) {
+				CONFIG_TIMER_PRESCALE_128();
+			} else {
+				return; // baud rate too low for AltSoftSerial
+			}
+#else
+			return; // baud rate too low for AltSoftSerial
+#endif
 		}
 	}
 	ticks_per_bit = cycles_per_bit;
@@ -103,6 +128,16 @@ void NeoICSerial::end(void)
 /****************************************/
 /**           Transmission             **/
 /****************************************/
+
+static NeoICSerial::TXCisr_t _TXCisr;
+
+void NeoICSerial::attachTxCompleteInterrupt( TXCisr_t fn )
+{
+  uint8_t oldSREG = SREG;
+  cli();
+    _TXCisr = fn;
+  SREG = oldSREG;
+}
 
 void NeoICSerial::writeByte(uint8_t b)
 {
@@ -169,6 +204,8 @@ ISR(COMPARE_A_INTERRUPT)
 			tx_state = 0;
 			CONFIG_MATCH_NORMAL();
 			DISABLE_INT_COMPARE_A();
+			if (_TXCisr)
+				_TXCisr();
 		}
 	} else {
 		if (++tail >= TX_BUFFER_SIZE) tail = 0;
@@ -221,9 +258,9 @@ static void rx_char( uint8_t rx_byte )
 
 ISR(CAPTURE_INTERRUPT)
 {
-	uint8_t state, bit;
+	uint8_t state, bit, head;
 	uint16_t capture, target;
-	int16_t offset;
+	uint16_t offset, offset_overflow;
 
 	capture = GET_INPUT_CAPTURE();
 	bit = rx_bit;
@@ -237,22 +274,24 @@ ISR(CAPTURE_INTERRUPT)
 	state = rx_state;
 	if (state == 0) {
 		if (!bit) {
-			SET_COMPARE_B(capture + rx_stop_ticks);
+			uint16_t end = capture + rx_stop_ticks;
+			SET_COMPARE_B(end);
 			ENABLE_INT_COMPARE_B();
 			rx_target = capture + ticks_per_bit + ticks_per_bit/2;
 			rx_state = 1;
 		}
 	} else {
 		target = rx_target;
+		offset_overflow = 65535 - ticks_per_bit;
 		while (1) {
 			offset = capture - target;
-			if (offset < 0) break;
+			if (offset > offset_overflow) break;
 			rx_byte = (rx_byte >> 1) | rx_bit;
 			target += ticks_per_bit;
 			state++;
 			if (state >= 9) {
 				DISABLE_INT_COMPARE_B();
-        rx_char( rx_byte );
+                rx_char( rx_byte );
 				CONFIG_CAPTURE_FALLING_EDGE();
 				rx_bit = 0;
 				rx_state = 0;
@@ -267,7 +306,7 @@ ISR(CAPTURE_INTERRUPT)
 
 ISR(COMPARE_B_INTERRUPT)
 {
-	uint8_t state, bit;
+	uint8_t head, state, bit;
 
 	DISABLE_INT_COMPARE_B();
 	CONFIG_CAPTURE_FALLING_EDGE();
@@ -277,7 +316,7 @@ ISR(COMPARE_B_INTERRUPT)
 		rx_byte = (rx_byte >> 1) | bit;
 		state++;
 	}
-  rx_char( rx_byte );
+    rx_char( rx_byte );
 	rx_state = 0;
 	CONFIG_CAPTURE_FALLING_EDGE();
 	rx_bit = 0;
@@ -330,9 +369,9 @@ void ftm0_isr(void)
 {
 	uint32_t flags = FTM0_STATUS;
 	FTM0_STATUS = 0;
+	if (flags & (1<<0) && (FTM0_C0SC & 0x40)) altss_compare_b_interrupt();
 	if (flags & (1<<5)) altss_capture_interrupt();
-	if (flags & (1<<6)) altss_compare_a_interrupt();
-	if (flags & (1<<0)) altss_compare_b_interrupt();
+	if (flags & (1<<6) && (FTM0_C6SC & 0x40)) altss_compare_a_interrupt();
 }
 #endif
 
